@@ -1,69 +1,60 @@
-# Create Virtual Private Cloud
-resource "aws_vpc" "custom_vpc" {
-  cidr_block           = var.custom_vpc
-  instance_tenancy     = var.instance_tenancy
-  enable_dns_support   = true
-  enable_dns_hostnames = true
+#############################################
+
+# Creating Virtual Private Cloud (VPC):
+
+#############################################
+resource "google_compute_network" "custom_vpc" {
+  name                    = lower(replace("${var.custom_name}-vpc", "_", "-"))
+  auto_create_subnetworks = false
 }
 
-# Create Public subnet
-resource "aws_subnet" "public_subnet" {
-  count                   = var.custom_vpc == "10.0.0.0/16" ? 3 : 0
-  vpc_id                  = aws_vpc.custom_vpc.id
-  availability_zone       = data.aws_availability_zones.azs.names[count.index]
-  cidr_block              = element(cidrsubnets(var.custom_vpc, 8, 4, 4), count.index)
-  map_public_ip_on_launch = true
-  tags = {
-    "Name" = "${var.custom_name}-Public-Subnet-${count.index}"
-  }
+#############################################
+
+# Creating Public subnet:
+
+#############################################
+
+resource "google_compute_subnetwork" "public_subnet" {
+  name          = lower(replace("${var.custom_name}-public-subnet", "_", "-"))
+  ip_cidr_range = "10.0.1.0/24" # Define the CIDR block for the subnet
+  region        = var.gcp_region
+  network       = google_compute_network.custom_vpc.self_link
 }
 
-# Create Internet Gateway
-resource "aws_internet_gateway" "igw" {
-  vpc_id = aws_vpc.custom_vpc.id
 
-  tags = {
-    "Name" = "${var.custom_name}-Internet-Gateway"
-  }
+#############################################
+
+# Creating Internet Gateway (Cloud Router):
+
+#############################################
+
+resource "google_compute_router" "igw" {
+  name                    = lower(replace("${var.custom_name}-router", "_", "-"))
+  network = google_compute_network.custom_vpc.name
+  region  = var.gcp_region
 }
 
-# Create Public Route Table
-resource "aws_route_table" "public_rt" {
-  vpc_id = aws_vpc.custom_vpc.id
+#############################################
 
-  tags = {
-    "Name" = "${var.custom_name}-Public-RouteTable"
-  }
+# Creating Public Route:
+
+#############################################
+
+resource "google_compute_route" "public_route" {
+  name                    = lower(replace("${var.custom_name}-route", "_", "-"))
+  dest_range       = "0.0.0.0/0"
+  network          = google_compute_network.custom_vpc.name
+  next_hop_gateway = "default-internet-gateway"
 }
 
-# Create Public Route
-resource "aws_route" "public_route" {
-  route_table_id         = aws_route_table.public_rt.id
-  destination_cidr_block = "0.0.0.0/0"
-  gateway_id             = aws_internet_gateway.igw.id
-}
+#############################################
 
-# Create Public Route Table Association
-resource "aws_route_table_association" "public_rt_association" {
-  count          = length(aws_subnet.public_subnet) == 3 ? 3 : 0
-  route_table_id = aws_route_table.public_rt.id
-  subnet_id      = element(aws_subnet.public_subnet.*.id, count.index)
-}
+# Creating VPC Network Peering:
 
-# Accepter's side of the connection
-resource "aws_vpc_peering_connection_accepter" "current" {
-  vpc_peering_connection_id = scylladbcloud_vpc_peering.scylladbcloud.connection_id
-  auto_accept               = true
+#############################################
 
-  tags = {
-    Side = "Accepter"
-  }
-}
-
-# Create SC Route:
-resource "aws_route" "scylla-cloud" {
-  route_table_id            = aws_route_table.public_rt.id
-  destination_cidr_block    = "172.31.0.0/16"
-  vpc_peering_connection_id = scylladbcloud_vpc_peering.scylladbcloud.connection_id
-  #  depends_on                = [aws_route_table.testing]
+resource "google_compute_network_peering" "network_peering" {
+  name         = lower(replace("${var.custom_name}-peering", "_", "-"))
+  network      = google_compute_network.custom_vpc.self_link
+  peer_network = scylladbcloud_vpc_peering.scylladbcloud.network_link
 }

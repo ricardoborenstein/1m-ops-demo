@@ -1,36 +1,50 @@
-# Create three EC2 instances based on the specified AMI, instance type, subnet ID, and security groups. 
-# Create tags to identify the instances and sets timeouts for creating the instances.
+resource "google_os_login_ssh_public_key" "default" {
+  user = data.google_client_openid_userinfo.me.email
+  key  = file(var.ssh_public_key) 
+}
+# Creating 3 GCP Instances:
+resource "google_compute_instance" "instance" {
+  count        = length(data.google_compute_zones.available.names)
+  name         = lower(replace("${var.custom_name}-loader-${count.index}", "_", "-"))
+  machine_type = var.instance_type
+  zone         = element(data.google_compute_zones.available.names, count.index)
 
-resource "aws_instance" "instance" {
-  count           = length(aws_subnet.public_subnet.*.id)
-  ami             = var.ami_id
-  instance_type   = var.instance_type
-  subnet_id       = element(aws_subnet.public_subnet.*.id, count.index)
-  security_groups = [aws_security_group.sg.id, ]
-  key_name        = var.aws_key_pair
-  tags = {
-    "Name"      = "${var.custom_name}-Loader-${count.index}"
-    "CreatedBy" = "scylladb-demo"
+  boot_disk {
+    initialize_params {
+      image = "projects/${var.image_project}/global/images/${var.image_name}"
+    }
   }
 
-  timeouts {
-    create = "10m"
+  network_interface {
+    subnetwork = element(google_compute_subnetwork.public_subnet.*.self_link, count.index)
+    access_config {
+      # This block is empty, so an ephemeral public IP will be used
+    }
   }
+metadata = {
+  #enable-oslogin = "TRUE"
+  ssh-keys = "${var.your_name}:${replace(file(var.ssh_public_key), "\n", "")}"
+
+}
 
   # Provision files to each instance. Copy three files from the current directory 
   # to the remote instance: stress-0.yml, cassandra-stress.service, and cassandra-stress-benchmark.service.
 
   provisioner "file" {
     source      = "./profile/stress-${count.index}.yml"
-    destination = "/home/scyllaadm/stress.yml"
+    destination = "/home/${var.your_name}/stress.yml"
+
   }
   provisioner "file" {
     source      = "./service/cassandra-stress.service"
-    destination = "/home/scyllaadm/cassandra-stress.service"
+    destination = "/home/${var.your_name}/cassandra-stress.service"
+
   }
-  provisioner "file" {
+
+    provisioner "file" {
     source      = "./service/cassandra-stress-benchmark.service"
-    destination = "/home/scyllaadm/cassandra-stress-benchmark.service"
+    destination = "/home/${var.your_name}/cassandra-stress-benchmark.service"
+
   }
 
   # Run remote-exec commands on each instance. It stops the scylla-server, creates a start.sh script, 
@@ -43,8 +57,8 @@ resource "aws_instance" "instance" {
       "echo '/usr/bin/cassandra-stress user profile=./stress.yml n=${var.num_of_ops} cl=local_quorum no-warmup \"ops(insert=1)\" -rate threads=${var.num_threads} fixed=450000/s -mode native cql3 user=${var.scylla_user} password=${local.scylla_pass} -log file=populating.log  -node ${local.scylla_ips}' > start.sh",
       "echo '/usr/bin/cassandra-stress user profile=./stress.yml duration=24h no-warmup cl=local_quorum \"ops(insert=4,simple1=2)\" -rate threads=${var.num_threads} fixed=${var.throttle} -mode native cql3 user=${var.scylla_user} password=${local.scylla_pass} -log file=benchmarking.log -node ${local.scylla_ips}' > benchmark.sh",
       "sudo chmod +x start.sh benchmark.sh",
-      "sudo mv /home/scyllaadm/cassandra-stress.service /etc/systemd/system/cassandra-stress.service ",
-      "sudo mv /home/scyllaadm/cassandra-stress-benchmark.service /etc/systemd/system/cassandra-stress-benchmark.service ", "sudo systemctl daemon-reload ",
+      "sudo mv /home/${var.your_name}/cassandra-stress.service /etc/systemd/system/cassandra-stress.service ",
+      "sudo mv /home/${var.your_name}/cassandra-stress-benchmark.service /etc/systemd/system/cassandra-stress-benchmark.service ", "sudo systemctl daemon-reload ",
       "sudo systemctl start cassandra-stress.service",
     ]
   }
@@ -53,30 +67,17 @@ resource "aws_instance" "instance" {
   # The coalesce function is used to select the public IP address of ScyllaDB Nodes.
   connection {
     type        = "ssh"
-    user        = "scyllaadm"
+    user        = "${var.your_name}"
     private_key = file(var.ssh_private_key)
-    host        = coalesce(self.public_ip, self.private_ip)
+    host        = coalesce(self.network_interface[0].access_config[0].nat_ip, self.network_interface[0].network_ip)
     agent       = true
   }
 
 }
 
-
-# Create three Elastic IPs
-resource "aws_eip" "eip" {
-  count            = length(aws_instance.instance.*.id)               # Create an Elastic IP for each EC2 instance
-  instance         = element(aws_instance.instance.*.id, count.index) # Associate the Elastic IP with the current EC2 instance
-  public_ipv4_pool = "amazon"                                         # Use the Amazon pool for public IPv4 addresses
-  vpc              = true                                             # Create a VPC Elastic IP address
-
-  tags = { # Add tags to the Elastic IP resource
-    "Name" = "${var.custom_name}-EIP-${count.index}"
-  }
+output "zone_output" {
+  value = [for i in range(length(data.google_compute_zones.available.names)) : element(data.google_compute_zones.available.names, i)]
+  description = "Prints the zones."
 }
 
-# Create EIP association with EC2 Instances
-resource "aws_eip_association" "eip_association" {
-  count         = length(aws_eip.eip)                              # Associate each Elastic IP with an EC2 instance
-  instance_id   = element(aws_instance.instance.*.id, count.index) # Associate the current Elastic IP with the current EC2 instance
-  allocation_id = element(aws_eip.eip.*.id, count.index)           # Associate the current Elastic IP with the current allocation ID
-}
+

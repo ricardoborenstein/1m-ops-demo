@@ -6,35 +6,50 @@
 variable "scylla_cloud_token" {
   description = "ScyllaDB Cloud API token"
   type        = string
-  default     = "ADD-YOUR-API-TOKEN-HERE"
+  default     = "xxxx"
 }
 
 # ScyllaDB Cloud region
 variable "scylla_cloud_region" {
   description = "ScyllaDB Cloud region of the cluster"
   type        = string
-  default     = "eu-north-1"
+  default     = "us-west1"
 }
 
-# SSH private key for EC2 instance access
+# Compute Engine region
+variable "gcp_region" {
+  description = "Compute Engine region of the Loaders"
+  type        = string
+  default     = "us-west1"
+}
+
+# SSH public key for Compute Engine instance access
+variable "ssh_public_key" {
+  description = "SSH public key for Compute Engine instance access"
+  type        = string
+  default     = "/Users/ricardo/.ssh/terraform.pub"
+}
+
+# SSH private key for Compute Engine instance access
 variable "ssh_private_key" {
-  description = "SSH private key location for EC2 instance access"
+  description = "SSH private key for Compute Engine instance access"
   type        = string
-  default     = "/home/user/Documents/your-private-key.pem"
+  default     = "/Users/ricardo/.ssh/terraform"
+}
+# GCP Project name ID
+variable "project" {
+  description = "Project-Name-ID where terraform will deploy the loaders"
+  type        = string
+  default     = "skilled-adapter-452"
+} 
+
+# Your Login Name
+variable "your_name" {
+  description = "user that will login intoter GCP instances"
+  type        = string
+  default     = "ricardo"
 }
 
-variable "aws_key_pair" {
-  description = "Key pair name in AWS"
-  type        = string
-  default     = "my-key-pair"
-}
-
-# AWS credentials file
-variable "aws_creds" {
-  description = "AWS credentials location"
-  type        = string
-  default     = "/home/user/.aws/credentials"
-}
 
 ################################################
 
@@ -47,36 +62,57 @@ variable "aws_creds" {
 variable "num_threads" {
   description = "Number of threads for the Cassandra stress tool"
   type        = string
-  default     = "350"
+  default     = "8"
 }
 
 # Total number of operations to run
 variable "num_of_ops" {
   description = "Total number of operations to run"
   type        = string
-  default     = "1000M"
+  default     = "1M"
 }
 
 # Throttling for the Cassandra stress tool
 variable "throttle" {
   description = "Throttling for the Cassandra stress tool (in ops/sec)"
   type        = string
-  default     = "1200000/s "
+  default     = "20000/s "
 }
 
-# EC2 instance type
+# Compute Engine instance type
 variable "instance_type" {
-  description = "Type of the EC2 instance"
+  description = "Type of the Compute Engine instance"
   type        = string
-  default     = "i4i.8xlarge"
+  default     = "n2-highmem-2"
+}
+
+variable "image_name" {
+  description = "The name of the image to use for the instances"
+  type        = string
+  default     = "scylladb-enterprise-2023-1-2"
+}
+
+variable "image_project" {
+  description = "The image project ID where the image is hosted"
+  type        = string
+  default     = "scylla-images"
+}
+
+# Virtual Private Cloud (VPC) IP range
+variable "subnet_cidrs" {
+  description = "List of CIDR blocks for the subnets"
+  type        = string
+  default     = "10.0.1.0/16" # Add more if needed
 }
 
 # ScyllaDB Cloud instance type
 variable "scylla_node_type" {
   description = "Type of ScyllaDB Cloud instance"
   type        = string
-  default     = "i3.8xlarge"
+  default     = "n2-highmem-2"
 }
+
+
 
 # ScyllaDB Cloud user
 variable "scylla_user" {
@@ -89,29 +125,9 @@ variable "scylla_user" {
 variable "custom_name" {
   description = "Name for the ScyllaDB Cloud environment"
   type        = string
-  default     = "ScyllaDB-Cloud-Demo"
+  default     = "ScyllaDB-Cloud-Demo-Ricardo"
 }
 
-# Virtual Private Cloud (VPC) IP range
-variable "custom_vpc" {
-  description = "CIDR block for the VPC"
-  type        = string
-  default     = "10.0.0.0/16"
-}
-
-# EC2 instance tenancy
-variable "instance_tenancy" {
-  description = "EC2 instance tenancy, default or dedicated"
-  type        = string
-  default     = "default"
-}
-
-# Amazon Machine Image (AMI) ID
-variable "ami_id" {
-  description = "AMI ID for the EC2 instance"
-  type        = string
-  default     = "ami-0a23f9b62c17c53fe"
-}
 
 # Number of ScyllaDB Cloud instances to create
 variable "scylla_node_count" {

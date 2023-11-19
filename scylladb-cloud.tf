@@ -15,11 +15,11 @@ provider "scylladbcloud" {
 # Create a ScyllaDB Cloud cluster
 resource "scylladbcloud_cluster" "scylladbcloud" {
   name               = var.custom_name              # Set the cluster name
-  region             = data.aws_region.current.name # Get the AWS region name where you want to launch the cluster
+  region             = var.gcp_region # Get the AWS region name where you want to launch the cluster
   node_count         = var.scylla_node_count        # Set the number of nodes in the cluster
   node_type          = var.scylla_node_type         # Set the instance type for the cluster nodes
   cidr_block         = "172.31.0.0/16"              # Set the CIDR block for the VPC
-  cloud              = "AWS"                        # Set the cloud provider to AWS
+  cloud              = "GCP"                        # Set the cloud provider to AWS
   enable_vpc_peering = true                         # Enable VPC peering
   enable_dns         = true                         # Enable DNS
 }
@@ -38,10 +38,10 @@ output "scylladbcloud_cluster_datacenter" {
 resource "scylladbcloud_vpc_peering" "scylladbcloud" {
   cluster_id      = scylladbcloud_cluster.scylladbcloud.id
   datacenter      = scylladbcloud_cluster.scylladbcloud.datacenter
-  peer_vpc_id     = aws_vpc.custom_vpc.id
-  peer_cidr_block = var.custom_vpc
-  peer_region     = data.aws_region.current.name
-  peer_account_id = data.aws_caller_identity.current.account_id
+  peer_vpc_id     = google_compute_network.custom_vpc.name
+  peer_cidr_block = var.subnet_cidrs
+  peer_region     = var.gcp_region
+  peer_account_id = data.google_project.project.project_id
   allow_cql       = true
 }
 

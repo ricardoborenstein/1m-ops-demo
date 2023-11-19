@@ -1,5 +1,4 @@
-provider "aws" {
-  region                   = var.scylla_cloud_region
-  shared_credentials_files = ["${var.aws_creds}"]
-  profile                  = "DeveloperAccessRole"
+provider "google" {
+  project     = var.project
+  region      = var.scylla_cloud_region
 }
